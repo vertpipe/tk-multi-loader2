@@ -258,6 +258,7 @@ class HoudiniActions(HookBaseClass):
 
         frame_pattern = re.compile("(%0(\d)d)")
         frame_pattern_name = re.compile("([^.]+)")
+        frame_pattern_name_version = re.compile("_v\d{3}")
 
         name = sg_publish_data.get("name")
         path = self.get_publish_path(sg_publish_data)
@@ -271,6 +272,10 @@ class HoudiniActions(HookBaseClass):
         frame_match_name = re.search(frame_pattern_name, name)
         if frame_match_name:
             name = frame_match_name.group(0)
+
+        frame_match_name_version = re.search(frame_pattern_name_version, name)
+        if frame_match_name_version:
+            name = name.replace(frame_match_name_version.group(0), '')
 
         self.logger.info(name)
 
