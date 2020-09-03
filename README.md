@@ -1,5 +1,4 @@
-![Version Label](https://img.shields.io/badge/version-0.1.1-blue)
-***
+![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/nfa-vfxim/tk-multi-loader2?include_prereleases)
 
 # tk-multi-loader2
 
