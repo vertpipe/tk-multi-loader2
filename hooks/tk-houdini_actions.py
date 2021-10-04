@@ -105,6 +105,15 @@ class HoudiniActions(HookBaseClass):
                     "description": "Load an image or image sequence via File COP.",
                 }
             )
+        if "usd_reference" in actions:
+            action_instances.append(
+                {
+                    "name": "usd_reference",
+                    "params": None,
+                    "caption": "Reference",
+                    "description": "This will create a reference node in the stage context.",
+                }
+            )
 
         return action_instances
 
@@ -163,6 +172,9 @@ class HoudiniActions(HookBaseClass):
 
         if name == "file_sop":
             self._file_sop(path, sg_publish_data)
+
+        if name == "usd_reference":
+            self._usd_reference(path, sg_publish_data)
 
         if name == "import":
             self._import(path, sg_publish_data)
@@ -275,7 +287,7 @@ class HoudiniActions(HookBaseClass):
 
         frame_match_name_version = re.search(frame_pattern_name_version, name)
         if frame_match_name_version:
-            name = name.replace(frame_match_name_version.group(0), '')
+            name = name.replace(frame_match_name_version.group(0), "")
 
         self.logger.info(name)
 
@@ -299,15 +311,45 @@ class HoudiniActions(HookBaseClass):
 
         file_sop = geo_node.createNode("file", name)
         file_sop.parm("file").set(path)
-        app.log_info(
-            "Creating file sop: %s\n  path: '%s' " % (file_sop.path(), path)
-        )
+        app.log_info("Creating file sop: %s\n  path: '%s' " % (file_sop.path(), path))
         file_sop.parm("reload").pressButton()
 
         _show_node(file_sop)
 
+    def _usd_reference(self, path, sg_publish_data):
+        # Import a USD file into a reference node in the stage context
+
+        import hou
+
+        asset_name = sg_publish_data.get("entity").get("name")
+        task = sg_publish_data.get("task").get("name")
+
+        name = asset_name + "_" + task
+
+        path = self.get_publish_path(sg_publish_data)
+
+        self.logger.info(name)
+
+        # houdini doesn't like UNC paths.
+        path = path.replace("\\", "/")
+
+        # Set stage
+        stage_context = _get_current_context("/stage")
+
+        # Create node
+        reference_node = stage_context.createNode("reference", name)
+
+        # Set parameters
+        reference_node.parm("filepath1").set(path)
+        reference_node.parm("primkind").set("group")
+        reference_node.parm("reftype").set("payload")
+
+        reference_node.parm("reload").pressButton()
+
+        _show_node(reference_node)
+
     ##############################################################################################################
-    
+
     def _file_cop(self, path, sg_publish_data):
         """Read the supplied path as a file COP.
 
@@ -420,7 +462,6 @@ def _get_current_network_panetab(context_type):
             and panetab.pwd().path().startswith(context_type)
             and panetab.isCurrentTab()
         ):
-
             network_tab = panetab
             break
 
