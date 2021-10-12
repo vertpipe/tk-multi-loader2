@@ -341,6 +341,7 @@ class HoudiniActions(HookBaseClass):
 
         # Set parameters
         reference_node.parm("filepath1").set(path)
+        reference_node.parm("primpath").set("/scene/$OS")
         reference_node.parm("primkind").set("group")
         reference_node.parm("reftype").set("payload")
 
