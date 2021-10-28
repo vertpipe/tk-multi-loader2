@@ -325,6 +325,7 @@ class HoudiniActions(HookBaseClass):
         task = sg_publish_data.get("task").get("name")
 
         name = asset_name + "_" + task
+        name = name.replace(' ', '_')
 
         path = self.get_publish_path(sg_publish_data)
 
