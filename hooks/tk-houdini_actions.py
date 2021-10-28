@@ -334,7 +334,7 @@ class HoudiniActions(HookBaseClass):
         path = path.replace("\\", "/")
 
         # Set stage
-        stage_context = _get_current_context("/stage")
+        stage_context = hou.node("/stage")
 
         # Create node
         reference_node = stage_context.createNode("reference", name)
