@@ -344,7 +344,14 @@ class NukeActions(HookBaseClass):
         camera_extensions = (".abc", ".fbx", ".usd")
 
         if ext.lower() in camera_extensions:
-            camera_node = nuke.createNode("Camera3")
+            try:
+                camera_node = nuke.createNode("Camera3")
+            except Exception as e:
+                if not ext.lower() == '.usd':
+                    camera_node = nuke.createNode("Camera2")
+                else:
+                    raise Exception("USD is not supported on this Nuke version.")
+
             camera_node["read_from_file"].setValue(True)
             camera_node["file"].fromUserText(path)
 
