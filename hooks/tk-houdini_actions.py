@@ -115,6 +115,16 @@ class HoudiniActions(HookBaseClass):
                 }
             )
 
+        if "usd_sublayer" in actions:
+            action_instances.append(
+                {
+                    "name": "usd_sublayer",
+                    "params": None,
+                    "caption": "Sublayer",
+                    "description": "This will create a sublayer node in the stage context.",
+                }
+            )
+
         return action_instances
 
     def execute_multiple_actions(self, actions):
@@ -175,6 +185,9 @@ class HoudiniActions(HookBaseClass):
 
         if name == "usd_reference":
             self._usd_reference(path, sg_publish_data)
+
+        if name == "usd_sublayer":
+            self._usd_sublayer(path, sg_publish_data)
 
         if name == "import":
             self._import(path, sg_publish_data)
@@ -349,6 +362,37 @@ class HoudiniActions(HookBaseClass):
         reference_node.parm("reload").pressButton()
 
         _show_node(reference_node)
+
+    def _usd_sublayer(self, path, sg_publish_data):
+        # Import a USD file into a sublayer node in the stage context
+
+        import hou
+
+        asset_name = sg_publish_data.get("entity").get("name")
+        task = sg_publish_data.get("task").get("name")
+
+        name = asset_name + "_" + task
+        name = name.replace(' ', '_')
+
+        path = self.get_publish_path(sg_publish_data)
+
+        self.logger.info(name)
+
+        # houdini doesn't like UNC paths.
+        path = path.replace("\\", "/")
+
+        # Set stage
+        stage_context = hou.node("/stage")
+
+        # Create node
+        sublayer_node = stage_context.createNode("sublayer", name)
+
+        # Set parameters
+        sublayer_node.parm("filepath1").set(path)
+
+        sublayer_node.parm("reload").pressButton()
+
+        _show_node(sublayer_node)
 
     ##############################################################################################################
 
