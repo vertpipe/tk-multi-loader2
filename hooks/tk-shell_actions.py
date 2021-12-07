@@ -67,7 +67,7 @@ class ShellActions(HookBaseClass):
 
         action_instances = []
 
-        # For the sake of easy test, we'll reuse Maya publish types.
+        # For the sake of easy test.py, we'll reuse Maya publish types.
 
         if "debug_action_1" in actions:
             action_instances.append(
