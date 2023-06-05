@@ -23,7 +23,7 @@ except ImportError:
 
 
 # This fixture will launch tk-run-app on first usage
-# and will remain valid until the test run ends.
+# and will remain valid until the test.py run ends.
 @pytest.fixture(scope="session")
 def host_application(tk_test_project, tk_test_entities):
     """
@@ -40,7 +40,7 @@ def host_application(tk_test_project, tk_test_entities):
             "python",
             "-m",
             "tk_toolchain.cmd_line_tools.tk_run_app",
-            # Allows the test for this application to be invoked from
+            # Allows the test.py for this application to be invoked from
             # another repository, namely the tk-framework-widget repo,
             # by specifying that the repo detection should start
             # at the specified location.

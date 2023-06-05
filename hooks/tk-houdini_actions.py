@@ -77,6 +77,15 @@ class HoudiniActions(HookBaseClass):
                     "description": "This will merge the item into the scene.",
                 }
             )
+        if "file_sop" in actions:
+            action_instances.append(
+                {
+                    "name": "file_sop",
+                    "params": None,
+                    "caption": "Import as file node",
+                    "description": "This will import the item into the scene through a file node.",
+                }
+            )
         if "import" in actions:
             action_instances.append(
                 {
@@ -94,6 +103,25 @@ class HoudiniActions(HookBaseClass):
                     "params": None,
                     "caption": "File COP",
                     "description": "Load an image or image sequence via File COP.",
+                }
+            )
+        if "usd_reference" in actions:
+            action_instances.append(
+                {
+                    "name": "usd_reference",
+                    "params": None,
+                    "caption": "Reference",
+                    "description": "This will create a reference node in the stage context.",
+                }
+            )
+
+        if "usd_sublayer" in actions:
+            action_instances.append(
+                {
+                    "name": "usd_sublayer",
+                    "params": None,
+                    "caption": "Sublayer",
+                    "description": "This will create a sublayer node in the stage context.",
                 }
             )
 
@@ -151,6 +179,15 @@ class HoudiniActions(HookBaseClass):
 
         if name == "merge":
             self._merge(path, sg_publish_data)
+
+        if name == "file_sop":
+            self._file_sop(path, sg_publish_data)
+
+        if name == "usd_reference":
+            self._usd_reference(path, sg_publish_data)
+
+        if name == "usd_sublayer":
+            self._usd_sublayer(path, sg_publish_data)
 
         if name == "import":
             self._import(path, sg_publish_data)
@@ -231,6 +268,134 @@ class HoudiniActions(HookBaseClass):
         _show_node(alembic_sop)
 
     ##############################################################################################################
+
+    def _file_sop(self, path, sg_publish_data):
+        """Import the supplied path as a file sop.
+
+        :param str path: The path to the file to import.
+        :param dict sg_publish_data: The publish data for the supplied path.
+
+        """
+
+        import hou
+
+        app = self.parent
+
+        frame_pattern = re.compile("(%0(\d)d)")
+        frame_pattern_name = re.compile("([^.]+)")
+        frame_pattern_name_version = re.compile("_v\d{3}")
+
+        name = sg_publish_data.get("name")
+        path = self.get_publish_path(sg_publish_data)
+
+        frame_match = re.search(frame_pattern, path)
+        if frame_match:
+            full_frame_spec = frame_match.group(1)
+            padding = frame_match.group(2)
+            path = path.replace(full_frame_spec, "$F%s" % (padding,))
+
+        frame_match_name = re.search(frame_pattern_name, name)
+        if frame_match_name:
+            name = frame_match_name.group(0)
+
+        frame_match_name_version = re.search(frame_pattern_name_version, name)
+        if frame_match_name_version:
+            name = name.replace(frame_match_name_version.group(0), "")
+
+        self.logger.info(name)
+
+        # houdini doesn't like UNC paths.
+        path = path.replace("\\", "/")
+
+        obj_context = _get_current_context("/obj")
+
+        try:
+            geo_node = obj_context.createNode("geo", name)
+        except hou.OperationFailed:
+            # failed to create the node in this context, create at top-level
+            obj_context = hou.node("/obj")
+            geo_node = obj_context.createNode("geo", name)
+
+        app.log_debug("Created geo node: %s" % (geo_node.path(),))
+
+        # delete the default nodes created in the geo
+        for child in geo_node.children():
+            child.destroy()
+
+        file_sop = geo_node.createNode("file", name)
+        file_sop.parm("file").set(path)
+        app.log_info("Creating file sop: %s\n  path: '%s' " % (file_sop.path(), path))
+        file_sop.parm("reload").pressButton()
+
+        _show_node(file_sop)
+
+    def _usd_reference(self, path, sg_publish_data):
+        # Import a USD file into a reference node in the stage context
+
+        import hou
+
+        asset_name = sg_publish_data.get("entity").get("name")
+        task = sg_publish_data.get("task").get("name")
+
+        name = asset_name + "_" + task
+        name = name.replace(' ', '_')
+
+        path = self.get_publish_path(sg_publish_data)
+
+        self.logger.info(name)
+
+        # houdini doesn't like UNC paths.
+        path = path.replace("\\", "/")
+
+        # Set stage
+        stage_context = hou.node("/stage")
+
+        # Create node
+        reference_node = stage_context.createNode("reference", name)
+
+        # Set parameters
+        reference_node.parm("filepath1").set(path)
+        reference_node.parm("primpath").set("/scene/$OS")
+        reference_node.parm("primkind").set("group")
+        reference_node.parm("reftype").set("payload")
+
+        reference_node.parm("reload").pressButton()
+
+        _show_node(reference_node)
+
+    def _usd_sublayer(self, path, sg_publish_data):
+        # Import a USD file into a sublayer node in the stage context
+
+        import hou
+
+        asset_name = sg_publish_data.get("entity").get("name")
+        task = sg_publish_data.get("task").get("name")
+
+        name = asset_name + "_" + task
+        name = name.replace(' ', '_')
+
+        path = self.get_publish_path(sg_publish_data)
+
+        self.logger.info(name)
+
+        # houdini doesn't like UNC paths.
+        path = path.replace("\\", "/")
+
+        # Set stage
+        stage_context = hou.node("/stage")
+
+        # Create node
+        sublayer_node = stage_context.createNode("sublayer", name)
+
+        # Set parameters
+        sublayer_node.parm("filepath1").set(path)
+
+        sublayer_node.parm("reload").pressButton()
+
+        _show_node(sublayer_node)
+
+    ##############################################################################################################
+
     def _file_cop(self, path, sg_publish_data):
         """Read the supplied path as a file COP.
 
@@ -343,7 +508,6 @@ def _get_current_network_panetab(context_type):
             and panetab.pwd().path().startswith(context_type)
             and panetab.isCurrentTab()
         ):
-
             network_tab = panetab
             break
 

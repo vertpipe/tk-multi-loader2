@@ -112,6 +112,26 @@ class NukeActions(HookBaseClass):
                 }
             )
 
+        if "geo_node" in actions:
+            action_instances.append(
+                {
+                    "name": "geo_node",
+                    "params": None,
+                    "caption": "Create Read Geo Node",
+                    "description": "This will add a read geo node to the current scene.",
+                }
+            )
+
+        if "camera_node" in actions:
+            action_instances.append(
+                {
+                    "name": "camera_node",
+                    "params": None,
+                    "caption": "Create Camera Node",
+                    "description": "This will add a camera node to the current scene.",
+                }
+            )
+
         return action_instances
 
     def execute_multiple_actions(self, actions):
@@ -176,6 +196,12 @@ class NukeActions(HookBaseClass):
 
         if name == "clip_import":
             self._import_clip(path, sg_publish_data)
+
+        if name == "geo_node":
+            self._create_geo_node(path, sg_publish_data)
+
+        if name == "camera_node":
+            self._create_camera_node(path, sg_publish_data)
 
     ##############################################################################################################
     # helper methods which can be subclassed in custom hooks to fine tune the behavior of things
@@ -259,11 +285,6 @@ class NukeActions(HookBaseClass):
 
         (_, ext) = os.path.splitext(path)
 
-        # If this is an Alembic cache, use a ReadGeo2 and we're done.
-        if ext.lower() == ".abc":
-            nuke.createNode("ReadGeo2", "file {%s}" % path)
-            return
-
         valid_extensions = [
             ".png",
             ".jpg",
@@ -300,6 +321,42 @@ class NukeActions(HookBaseClass):
             # override the detected frame range.
             read_node["first"].setValue(seq_range[0])
             read_node["last"].setValue(seq_range[1])
+
+    def _create_geo_node(self, path, sg_publish_data):
+        import nuke
+
+        (_, ext) = os.path.splitext(path)
+
+        geo_extensions = (".abc", ".fbx", ".usd")
+
+        if ext.lower() in geo_extensions:
+            read_geo_node = nuke.createNode("ReadGeo2")
+            read_geo_node["file"].fromUserText(path)
+
+        else:
+            raise Exception("Unsupported file extension for '%s'!" % path)
+
+    def _create_camera_node(self, path, sg_publish_data):
+        import nuke
+
+        (_, ext) = os.path.splitext(path)
+
+        camera_extensions = (".abc", ".fbx", ".usd")
+
+        if ext.lower() in camera_extensions:
+            try:
+                camera_node = nuke.createNode("Camera3")
+            except Exception as e:
+                if not ext.lower() == '.usd':
+                    camera_node = nuke.createNode("Camera2")
+                else:
+                    raise Exception("USD is not supported on this Nuke version.")
+
+            camera_node["read_from_file"].setValue(True)
+            camera_node["file"].fromUserText(path)
+
+        else:
+            raise Exception("Unsupported file extension for '%s'!" % path)
 
     def _sequence_range_from_path(self, path):
         """

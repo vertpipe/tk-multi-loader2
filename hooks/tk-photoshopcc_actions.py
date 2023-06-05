@@ -13,6 +13,7 @@ Hook that loads defines all the available actions, broken down by publish type.
 """
 
 import os
+import re
 
 import sgtk
 from sgtk.platform.qt import QtGui
@@ -152,6 +153,17 @@ class PhotoshopActions(HookBaseClass):
         # so convert the path to ensure filenames containing complex characters are supported
         path = six.ensure_text(self.get_publish_path(sg_publish_data))
 
+        # Check for image sequence, and search first frame
+        if "%" in path:
+            folder = os.path.dirname(path)
+
+            frame_sequences = self.__get_frame_sequences(folder)
+
+            frame_sequence = frame_sequences[0]
+            first_frame = int(min(frame_sequence[1]))
+
+            path = path % first_frame
+
         if not os.path.exists(path):
             raise Exception("File not found on disk - '%s'" % path)
 
@@ -236,3 +248,105 @@ class PhotoshopActions(HookBaseClass):
             action_desc,
             adobe.DialogModes.NO,
         )
+
+    @staticmethod
+    def __get_frame_sequences(folder, extensions=None, frame_spec=None):
+        """
+        Copied from the publisher plugin, and customized to return file sequences with frame lists instead of filenames
+        Given a folder, inspect the contained files to find what appear to be
+        files with frame numbers.
+        :param folder: The path to a folder potentially containing a sequence of
+            files.
+        :param extensions: A list of file extensions to retrieve paths for.
+            If not supplied, the extension will be ignored.
+        :param frame_spec: A string to use to represent the frame number in the
+            return sequence path.
+        :return: A list of tuples for each identified frame sequence. The first
+            item in the tuple is a sequence path with the frame number replaced
+            with the supplied frame specification. If no frame spec is supplied,
+            a python string format spec will be returned with the padding found
+            in the file.
+            Example::
+            get_frame_sequences(
+                "/path/to/the/folder",
+                ["exr", "jpg"],
+                frame_spec="{FRAME}"
+            )
+            [
+                (
+                    "/path/to/the/supplied/folder/key_light1.{FRAME}.exr",
+                    [<frame_1_framenumber>, <frame_2_framenumber>, ...]
+                ),
+                (
+                    "/path/to/the/supplied/folder/fill_light1.{FRAME}.jpg",
+                    [<frame_1_framenumber>, <frame_2_framenumber>, ...]
+                )
+            ]
+        """
+        FRAME_REGEX = re.compile(r"(.*)([._-])(\d+)\.([^.]+)$", re.IGNORECASE)
+
+        # list of already processed file names
+        processed_names = {}
+
+        # examine the files in the folder
+        for filename in os.listdir(folder):
+            file_path = os.path.join(folder, filename)
+
+            if os.path.isdir(file_path):
+                # ignore subfolders
+                continue
+
+            # see if there is a frame number
+            frame_pattern_match = re.search(FRAME_REGEX, filename)
+
+            if not frame_pattern_match:
+                # no frame number detected. carry on.
+                continue
+
+            prefix = frame_pattern_match.group(1)
+            frame_sep = frame_pattern_match.group(2)
+            frame_str = frame_pattern_match.group(3)
+            extension = frame_pattern_match.group(4) or ""
+
+            # filename without a frame number.
+            file_no_frame = "%s.%s" % (prefix, extension)
+
+            if file_no_frame in processed_names:
+                # already processed this sequence. add the framenumber to the list, later we can use this to determine the framerange
+                processed_names[file_no_frame]["frame_list"].append(frame_str)
+                continue
+
+            if extensions and extension not in extensions:
+                # not one of the extensions supplied
+                continue
+
+            # make sure we maintain the same padding
+            if not frame_spec:
+                padding = len(frame_str)
+                frame_spec = "%%0%dd" % (padding,)
+
+            seq_filename = "%s%s%s" % (prefix, frame_sep, frame_spec)
+
+            if extension:
+                seq_filename = "%s.%s" % (seq_filename, extension)
+
+            # build the path in the same folder
+            seq_path = os.path.join(folder, seq_filename)
+
+            # remember each seq path identified and a list of files matching the
+            # seq pattern
+            processed_names[file_no_frame] = {
+                "sequence_path": seq_path,
+                "frame_list": [frame_str],
+            }
+
+        # build the final list of sequence paths to return
+        frame_sequences = []
+        for file_no_frame in processed_names:
+
+            seq_info = processed_names[file_no_frame]
+            seq_path = seq_info["sequence_path"]
+
+            frame_sequences.append((seq_path, seq_info["frame_list"]))
+
+        return frame_sequences
